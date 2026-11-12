@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Práctica Docker - CRUD de productos</title>
+<style>
+:root{font-family:Arial,Helvetica,sans-serif;color:#203047;background:#f5f7fa}body{max-width:870px;margin:30px auto;padding:0 18px}header{background:#203047;color:white;padding:22px;border-radius:12px}h1{margin:0 0 8px;font-size:1.6rem}p{line-height:1.5}.meta{color:#d7e7ff}.card{background:white;border:1px solid #dce3ee;border-radius:12px;padding:20px;margin:18px 0;box-shadow:0 2px 8px #0000000a}label{display:block;font-weight:bold;margin:8px 0}input{box-sizing:border-box;width:100%;padding:10px;border:1px solid #aebacb;border-radius:6px}button{padding:9px 14px;border:0;border-radius:6px;background:#1664a6;color:white;cursor:pointer;margin-right:6px;margin-top:8px}button.danger{background:#9c3030}button.secondary{background:#637184}table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #dce3ee;padding:10px;text-align:left}#msg{min-height:1.4em;color:#164d83}small{color:#536175}code{background:#eef2f7;padding:2px 4px;border-radius:4px}
+</style>
+</head>
+<body>
+<header><h1>CRUD de productos - Docker</h1><p class="meta">Práctica de Programación en la Nube: dos Nginx, API Python, SQLite y redes Docker.</p><small style="color:white">Servicio web en puerto <span id="puerto"></span></small></header>
+<section class="card"><h2>Agregar o editar</h2><form id="form"><label for="nombre">Nombre</label><input id="nombre" maxlength="120" required placeholder="Ej.: Cuaderno"><label for="precio">Precio</label><input id="precio" type="number" min="0" max="1000000000" step="0.01" required placeholder="Ej.: 2.50"><button id="guardar" type="submit">Crear producto</button><button id="cancelar" type="button" class="secondary" hidden>Cancelar edición</button></form><p id="msg" role="status"></p></section>
+<section class="card"><h2>Productos registrados</h2><table><thead><tr><th>ID</th><th>Nombre</th><th>Precio</th><th>Acciones</th></tr></thead><tbody id="lista"></tbody></table><p id="vacio">Cargando...</p></section>
+<p><small>Práctica académica. Los datos se conservan en el volumen Docker <code>datos_app</code>.</small></p>
+<script>
+const base='/api/productos';let editId=null;let productos=[];const $=id=>document.getElementById(id);
+$('puerto').textContent=location.port||'80';
+async function cargar(){try{const r=await fetch(base);if(!r.ok)throw Error('HTTP '+r.status);productos=await r.json();$('lista').replaceChildren();$('vacio').textContent=productos.length?'':'Sin productos. Crea el primero.';for(const p of productos){let tr=document.createElement('tr');for(const v of [p.id,p.nombre,Number(p.precio).toFixed(2)]){const td=document.createElement('td');td.textContent=v;tr.append(td)}const acciones=document.createElement('td');const editar=document.createElement('button');editar.textContent='Editar';editar.addEventListener('click',()=>iniciarEdicion(p.id));const borrar=document.createElement('button');borrar.textContent='Eliminar';borrar.className='danger';borrar.addEventListener('click',()=>eliminar(p.id));acciones.append(editar,borrar);tr.append(acciones);$('lista').append(tr)}}catch(e){$('vacio').textContent='Error al cargar: '+e.message}}
+function iniciarEdicion(id){const p=productos.find(x=>x.id===id);if(!p)return;editId=id;$('nombre').value=p.nombre;$('precio').value=p.precio;$('guardar').textContent='Guardar cambios';$('cancelar').hidden=false;window.scrollTo({top:0,behavior:'smooth'})}
+function cancelar(){editId=null;$('form').reset();$('guardar').textContent='Crear producto';$('cancelar').hidden=true}
+$('cancelar').addEventListener('click',cancelar);
+$('form').addEventListener('submit',async e=>{e.preventDefault();const body={nombre:$('nombre').value.trim(),precio:Number($('precio').value)};try{const r=await fetch(editId===null?base:`${base}/${editId}`,{method:editId===null?'POST':'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw Error(data.error||'HTTP '+r.status);$('msg').textContent=editId===null?'Producto creado.':'Producto actualizado.';cancelar();await cargar()}catch(e){$('msg').textContent='Error: '+e.message}});
+async function eliminar(id){if(!confirm('¿Eliminar el producto '+id+'?'))return;try{const r=await fetch(`${base}/${id}`,{method:'DELETE'});if(!r.ok)throw Error('HTTP '+r.status);$('msg').textContent='Producto eliminado.';await cargar()}catch(e){$('msg').textContent='Error: '+e.message}}
+cargar();
+</script>
+</body>
+</html>

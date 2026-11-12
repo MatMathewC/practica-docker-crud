@@ -1,0 +1,73 @@
+name: practica-nube-crud
+
+services:
+  api:
+    build:
+      context: ./api
+    environment:
+      DB_PATH: ${DB_PATH:-/data/app.db}
+      PORT: '8000'
+    volumes:
+      - datos_app:/data
+    networks:
+      - lab_front
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 12
+      start_period: 4s
+    restart: unless-stopped
+
+  web_a:
+    image: nginx:stable-alpine
+    ports:
+      - "127.0.0.1:${WEB_A_PORT:-8080}:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./web:/usr/share/nginx/html:ro
+    networks:
+      - lab_front
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web_b:
+    image: nginx:stable-alpine
+    ports:
+      - "127.0.0.1:${WEB_B_PORT:-8081}:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./web:/usr/share/nginx/html:ro
+    networks:
+      - lab_front
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  client_a:
+    image: alpine:3.22
+    command: ["sleep", "infinity"]
+    init: true
+    networks:
+      - lab_front
+    restart: unless-stopped
+
+  client_b:
+    image: alpine:3.22
+    command: ["sleep", "infinity"]
+    init: true
+    networks:
+      - lab_back
+    restart: unless-stopped
+
+networks:
+  lab_front:
+    driver: bridge
+  lab_back:
+    driver: bridge
+
+volumes:
+  datos_app:
